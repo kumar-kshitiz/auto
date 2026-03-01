@@ -1,0 +1,4 @@
+node_modules/
+.env
+phi.js
+tempConst.js
