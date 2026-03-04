@@ -36,6 +36,7 @@ const generateWithGemini = async(subject,jd,skills,formattedDetails) =>{
         });
 
         const outputText = interaction.outputs[interaction.outputs.length - 1].text;
+        // console.log(outputText);
         return outputText;
 
     }catch(err){
