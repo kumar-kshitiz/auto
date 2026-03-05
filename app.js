@@ -43,7 +43,7 @@ const createDraft = async({to,subject,message}) => {
       `From: ${user.email}`,
       `To: ${to}` ,
       `Subject: ${subject}`,
-      "Content-Type: text/plain; charset=utf-8",
+      "Content-Type: text/html; charset=utf-8",
       "",
       message,
     ];
@@ -99,11 +99,43 @@ app.post('/generate-and-send',async(req,res)=>{
             formattedDetails
         );
 
+        const content = JSON.parse(generatedMessage);
+        const htmlMessage = `
+                        <div style="font-family: Arial, Helvetica, sans-serif; line-height:1.6; color:#333; font-size:15px;">
+                        <p>Dear Hiring Manager,</p>
+                        <p>
+                        ${content.intro}
+                        </p>
+                        <p>
+                        ${content.skills}
+                        </p>
+                        <p>
+                        ${content.projects}
+                        </p>
+                        <p>
+                        ${content.closing}
+                        </p>
+                        <p>
+                        You can review some of my work here:
+                        </p>
+                        <p>
+                        Portfolio: <a href="${personalDetails.portfolioLink}">${personalDetails.portfolioLink}</a><br/>
+                        GitHub: <a href="${personalDetails.githubProfileLink}">${personalDetails.githubProfileLink}</a><br/>
+                        LinkedIn: <a href="${personalDetails.linkedinProfileLink}">${personalDetails.linkedinProfileLink}</a>
+                        </p>
+
+                        <p style="margin-bottom: 5px;">Best Regards,</p> 
+                        <p style="color:#6b7280; margin:0;"> 
+                        <strong>${personalDetails.name}</strong><br/> 
+                        ${personalDetails.phone} </p>
+
+                      </div>
+        `;
         // console.log(generatedMessage);
         const result = await sendMail({
           to,
           subject,
-          message:generatedMessage,
+          message:htmlMessage,
         });
         // console.log(result);
         // console.log(generatedMail);
