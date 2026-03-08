@@ -3,3 +3,11 @@ node_modules/
 phi.js
 tempConst.js
 a.py
+playwright
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
