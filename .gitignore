@@ -11,3 +11,4 @@ playwright
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+wasted.js
