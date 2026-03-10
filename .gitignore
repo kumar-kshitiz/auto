@@ -4,6 +4,7 @@ phi.js
 tempConst.js
 a.py
 playwright
+chrome-profile
 
 # Playwright
 /test-results/
@@ -12,4 +13,3 @@ playwright
 /playwright/.cache/
 /playwright/.auth/
 wasted.js
-chrome-profile/
