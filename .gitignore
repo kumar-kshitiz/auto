@@ -12,3 +12,4 @@ playwright
 /playwright/.cache/
 /playwright/.auth/
 wasted.js
+chrome-profile/

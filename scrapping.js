@@ -2,14 +2,18 @@ import { chromium } from "playwright";
 
 const category = "Software Development";
 
-async function randomWait(page, min = 1000, max = 2000) {
+async function randomWait(page, min = 1000, max = 1500) {
   const delay = Math.floor(Math.random() * (max - min + 1)) + min;
   await page.waitForTimeout(delay);
 }
 
-async function smoothScroll(page) {
-  for (let i = 0; i < 8; i++) {
-    await page.mouse.wheel(0, 800);
+async function smoothScroll(page,scrollState) {
+  // for (let i = 0; i < 10; i++) {
+  //   await page.mouse.wheel(0, 2000);
+  //   await page.waitForTimeout(600);
+  // }
+  while(scrollState.keepScrolling){
+    await page.mouse.wheel(0, 100);
     await page.waitForTimeout(500);
   }
 }
@@ -35,9 +39,7 @@ const page = await context.newPage();
 
 console.log("Opening Internshala...");
 
-await page.goto("https://internshala.com/internships/", {
-  waitUntil: "domcontentloaded"
-});
+await page.goto("https://internshala.com/internships/");
 
 
 // CHECK LOGIN
@@ -63,6 +65,10 @@ if (!profileName) {
 
 console.log("Logged in as:", profileName);
 
+await page.goto("https://internshala.com/internships/", {
+  waitUntil: "domcontentloaded"
+});
+
 // SELECT CATEGORY
 await page.evaluate((category) => {
 
@@ -82,7 +88,9 @@ await page.evaluate((category) => {
 // wait for internships
 await page.waitForSelector("h3.job-internship-name");
 
-await smoothScroll(page);
+let scrollState = { keepScrolling: true };
+// not wait even async call
+const scrollTask = smoothScroll(page,scrollState);
 
 
 const jobTitles = page.locator("h3.job-internship-name");
@@ -92,10 +100,10 @@ const stipends = page.locator(".stipend");
 const durations = page.locator(".ic-16-calendar + span");
 const postedAt = page.locator(".ic-16-reschedule + span");
 const ppoStatus = page.locator(".ppo_status span span");
-const cards = page.locator(".individual_internship");
+const link = page.locator("h3.job-internship-name a");
 
+// const count = page.locator(".individual_internship");
 const count = await jobTitles.count();
-
 console.log("Total internships found:", count);
 
 const applyLinks = [];
@@ -108,11 +116,17 @@ for (let i = 0; i < count; i++) {
   const stipend = await stipends.nth(i).textContent();
   const duration = await durations.nth(i).textContent();
   const postago = await postedAt.nth(i).textContent();
-  const ppoText = await ppoStatus.nth(i).textContent();
+  // const ppoText = await ppoStatus.nth(i).textContent();
 
-  const ppoOffered = ppoText ? ppoText.trim() : "Not mentioned";
+  // const ppoOffered = ppoText ? ppoText.trim() : "Not mentioned";
+  let ppoOffered = "Not mentioned";
 
-  const applyLink = await cards.nth(i).getAttribute("data-href");
+  if (await ppoStatus.count() > i) {
+    const ppoText = await ppoStatus.nth(i).textContent();
+    ppoOffered = ppoText ? ppoText.trim() : "Not mentioned";
+  }
+
+  const applyLink = await link.nth(i).getAttribute("href");
 
   const fullLink = "https://internshala.com" + applyLink;
 
@@ -130,6 +144,8 @@ for (let i = 0; i < count; i++) {
   console.log("----------------");
 }
 
+scrollState.keepScrolling = false;
+await scrollTask;
 
 // PRINT LINKS
 console.log("\nCollected Apply Links:\n");
@@ -137,5 +153,9 @@ console.log("\nCollected Apply Links:\n");
 for (const link of applyLinks) {
   console.log(link);
 }
+
+page.close();
+context.close();
+
 
 })();
