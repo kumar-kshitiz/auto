@@ -1,6 +1,72 @@
 import { chromium } from "playwright";
 
-const category = "Software Development";
+const category = "software development";
+// const url = "net-development,3d-printing,ai-agent-development,asp-net,accounts,acting,aerospace,agriculture-and-food-engineering,analytics,anchoring,android-app-development,angular-js-development,animation,architecture,artificial-intelligence-ai,audio-making-editing,auditing,automobile-engineering,backend-development,bank,big-data,bioinformatics,biology,biotech,blockchain-development,blogging,brand-management,business-development,mba,ca-articleship,cad-design,civil,cloud-computing,computer-science,computer-vision,cyber-security,data-entry,data-science,database-building,electrical,flutter-development,front-end-development,full-stack-development,java,javascript-development,mlops-engineering,machine-learning,natural-language-processing-nlp,node-js-development,search-engine-optimization-seo,software-development,software-testing,web-development,wordpress-development-internship";
+
+const categoryMap = {
+  "net development": "net-development",
+  "3d printing": "3d-printing",
+  "ai agent development": "ai-agent-development",
+  "asp net": "asp-net",
+  "accounts": "accounts",
+  "acting": "acting",
+  "aerospace": "aerospace",
+  "agriculture and food engineering": "agriculture-and-food-engineering",
+  "analytics": "analytics",
+  "anchoring": "anchoring",
+  "android app development": "android-app-development",
+  "angular js development": "angular-js-development",
+  "animation": "animation",
+  "architecture": "architecture",
+  "artificial intelligence": "artificial-intelligence-ai",
+  "audio making editing": "audio-making-editing",
+  "auditing": "auditing",
+  "automobile engineering": "automobile-engineering",
+  "backend development": "backend-development",
+  "bank": "bank",
+  "big data": "big-data",
+  "bioinformatics": "bioinformatics",
+  "biology": "biology",
+  "biotech": "biotech",
+  "blockchain development": "blockchain-development",
+  "blogging": "blogging",
+  "brand management": "brand-management",
+  "business development": "business-development",
+  "mba": "mba",
+  "ca articleship": "ca-articleship",
+  "cad design": "cad-design",
+  "civil": "civil",
+  "cloud computing": "cloud-computing",
+  "computer science": "computer-science",
+  "computer vision": "computer-vision",
+  "cyber security": "cyber-security",
+  "data entry": "data-entry",
+  "data science": "data-science",
+  "database building": "database-building",
+  "electrical": "electrical",
+  "flutter development": "flutter-development",
+  "front end development": "front-end-development",
+  "full stack development": "full-stack-development",
+  "java": "java",
+  "javascript development": "javascript-development",
+  "mlops engineering": "mlops-engineering",
+  "machine learning": "machine-learning",
+  "natural language processing": "natural-language-processing-nlp",
+  "node js development": "node-js-development",
+  "seo": "search-engine-optimization-seo",
+  "software development": "software-development",
+  "software testing": "software-testing",
+  "web development": "web-development",
+  "wordpress development": "wordpress-development"
+};
+
+function getInternshalaLink(category){
+  const slug = categoryMap[category.toLowerCase().trim()];
+  if(!slug){
+    throw new Error("Invalid Category");
+  }
+  return `https://internshala.com/internships/${slug}-internship/`;
+}
 
 async function randomWait(page, min = 1000, max = 1500) {
   const delay = Math.floor(Math.random() * (max - min + 1)) + min;
@@ -65,28 +131,12 @@ if (!profileName) {
 
 console.log("Logged in as:", profileName);
 
-await page.goto("https://internshala.com/internships/", {
+const categoryLink = getInternshalaLink(category);
+
+await page.goto(categoryLink, {
   waitUntil: "domcontentloaded"
 });
 
-// SELECT CATEGORY
-await page.evaluate((category) => {
-
-  const select = document.querySelector("#select_category");
-
-  const option = Array.from(select.options)
-    .find(o => o.textContent.trim() === category);
-
-  if (option) {
-    select.value = option.value;
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-  }
-
-}, category);
-
-
-// wait for internships
-await page.waitForSelector("h3.job-internship-name");
 
 let scrollState = { keepScrolling: true };
 // not wait even async call
@@ -96,7 +146,7 @@ const scrollTask = smoothScroll(page,scrollState);
 const jobTitles = page.locator("h3.job-internship-name");
 const companies = page.locator("p.company-name");
 const locations = page.locator(".locations span a");
-const stipends = page.locator(".stipend");
+const stipends = page.locator("span.stipend");
 const durations = page.locator(".ic-16-calendar + span");
 const postedAt = page.locator(".ic-16-reschedule + span");
 const ppoStatus = page.locator(".ppo_status span span");
