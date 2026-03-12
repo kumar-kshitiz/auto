@@ -158,7 +158,7 @@ console.log("Total internships found:", count);
 
 const applyLinks = [];
 
-for (let i = 0; i < count; i++) {
+for (let i = 0; i < count-40; i++) {
 
   const title = await jobTitles.nth(i).textContent();
   const company = await companies.nth(i).textContent();
@@ -200,9 +200,90 @@ await scrollTask;
 // PRINT LINKS
 console.log("\nCollected Apply Links:\n");
 
+// for (const link of applyLinks) {
+//   console.log(link);
+// }
+
+// apply to the link:
+
 for (const link of applyLinks) {
-  console.log(link);
+  // open extracted link:
+  const jobPage = await context.newPage();
+  await jobPage.goto('https://internshala.com/internship/detail/flutter-development-internship-in-faridabad-at-l2bc1773122527',{ waitUntil: "domcontentloaded" });
+
+  const applyBtn = jobPage.locator('#top_easy_apply_button');
+
+  if (await applyBtn.isVisible()) {
+    await applyBtn.click();
+    console.log("Clicked Apply button");
+  } else {
+    console.log("Apply button not found");
+  }
+
+// confirmation availability question set to YES
+const availabilityOption = jobPage.locator('#confirm_availability_container label').first();
+
+if (await availabilityOption.count() > 0) {
+  await availabilityOption.check();   // better for radio buttons
+  console.log("Availability confirmed");
+} else {
+  console.log("Availability option not present");
 }
+
+// check whether additional question present or not ?
+
+const availabilityOfAdditionalQues=jobPage.locator('.additional_question');
+
+if(await availabilityOfAdditionalQues.count()>0){
+  console.log("Additional questions present");
+  //count no.of question present:
+  // const questCount = await availabilityOfAdditionalQues.count();
+
+  // Additional question - two types:
+  const questions = jobPage.locator('.form-group.additional_question');
+const questCount = await questions.count();
+
+for (let i = 0; i < questCount; i++) {
+
+  const questionBlock = questions.nth(i);
+
+  const optionQues = questionBlock.locator('.custom_question_boolean_container');
+  const textQues = questionBlock.locator('.assessment_question label');
+
+  // TYPE 1: Option question
+  if (await optionQues.count() > 0) {
+    await optionQues.locator('label').first().click();
+    console.log("Option based question present");
+  }
+
+  // TYPE 2: Text question
+  else if (await textQues.count() > 0) {
+    const question = await textQues.innerText();
+    console.log("Custom question:", question);
+  }
+}
+  
+  // jobPage.locator('.custom_question_boolean_container')
+}else{
+  console.log("No additional questions available")
+}
+
+
+
+
+  await page.waitForSelector("a.apply_now_button",{ timeout: 12000000 });
+  // page.setDefaultNavigationTimeout(6000000);
+
+  // await page.click("#easy_apply_button");
+  
+  // const getNewApplyLink = await page.locator('a.apply_now_button').getAttribute("href");
+  // const newFullLink = "https://internshala.com" + getNewApplyLink;
+  // console.log(newFullLink);
+  
+  // close this page
+  jobPage.close();
+}
+
 
 page.close();
 context.close();
