@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import {answerWithGemini} from './intern_ques_gemini.js';
 
 const category = "software development";
 // const url = "net-development,3d-printing,ai-agent-development,asp-net,accounts,acting,aerospace,agriculture-and-food-engineering,analytics,anchoring,android-app-development,angular-js-development,animation,architecture,artificial-intelligence-ai,audio-making-editing,auditing,automobile-engineering,backend-development,bank,big-data,bioinformatics,biology,biotech,blockchain-development,blogging,brand-management,business-development,mba,ca-articleship,cad-design,civil,cloud-computing,computer-science,computer-vision,cyber-security,data-entry,data-science,database-building,electrical,flutter-development,front-end-development,full-stack-development,java,javascript-development,mlops-engineering,machine-learning,natural-language-processing-nlp,node-js-development,search-engine-optimization-seo,software-development,software-testing,web-development,wordpress-development-internship";
@@ -68,7 +69,7 @@ function getInternshalaLink(category){
   return `https://internshala.com/internships/${slug}-internship/`;
 }
 
-async function randomWait(page, min = 1000, max = 1500) {
+async function randomWait(page, min = 1000, max = 3000) {
   const delay = Math.floor(Math.random() * (max - min + 1)) + min;
   await page.waitForTimeout(delay);
 }
@@ -209,9 +210,14 @@ console.log("\nCollected Apply Links:\n");
 for (const link of applyLinks) {
   // open extracted link:
   const jobPage = await context.newPage();
-  await jobPage.goto('https://internshala.com/internship/detail/flutter-development-internship-in-faridabad-at-l2bc1773122527',{ waitUntil: "domcontentloaded" });
+  await jobPage.goto(link,{ waitUntil: "domcontentloaded" });
 
   const applyBtn = jobPage.locator('#top_easy_apply_button');
+  const applyBtn2 = jobPage.locator('.apply_now_btn');
+
+  if (await applyBtn2.isDisabled()) {
+    continue;
+  }
 
   if (await applyBtn.isVisible()) {
     await applyBtn.click();
@@ -239,15 +245,17 @@ if(await availabilityOfAdditionalQues.count()>0){
   //count no.of question present:
   // const questCount = await availabilityOfAdditionalQues.count();
 
-  // Additional question - two types:
+  // Additional question - three types:
   const questions = jobPage.locator('.form-group.additional_question');
 const questCount = await questions.count();
 
-for (let i = 0; i < questCount; i++) {
+
+  for (let i = 0; i < questCount; i++) {
 
   const questionBlock = questions.nth(i);
 
   const optionQues = questionBlock.locator('.custom_question_boolean_container');
+  const rangeSelect = questionBlock.locator('select.custom_question_range');
   const textQues = questionBlock.locator('.assessment_question label');
 
   // TYPE 1: Option question
@@ -256,22 +264,45 @@ for (let i = 0; i < questCount; i++) {
     console.log("Option based question present");
   }
 
-  // TYPE 2: Text question
+  // // TYPE 2: Range question
+  // else if (await rangeSelect.count() > 0) {
+
+  //   const options = rangeSelect.locator('option:not([disabled])');
+  //   const count = await options.count();
+
+  //   const lastValue = await options.nth(count - 1).getAttribute('value');
+
+  //   await rangeSelect.selectOption(lastValue);
+
+  //   console.log("Range question answered with:", lastValue);
+  // }
+
+  // TYPE 3: Text question
   else if (await textQues.count() > 0) {
+
     const question = await textQues.innerText();
+
+    const generatedAnswer = await answerWithGemini(question);
+
     console.log("Custom question:", question);
+    console.log("Gemini answer:", generatedAnswer);
+
+    const textarea = questionBlock.locator('textarea');
+
+    await textarea.fill(generatedAnswer);
   }
 }
-  
-  // jobPage.locator('.custom_question_boolean_container')
 }else{
   console.log("No additional questions available")
 }
 
+const submitbtn = jobPage.locator('.submit_button_container');
 
+await submitbtn.click();
 
+await randomWait(jobPage);
 
-  await page.waitForSelector("a.apply_now_button",{ timeout: 12000000 });
+  // await page.waitForSelector("a.apply_now_button",{ timeout: 12000000 });
   // page.setDefaultNavigationTimeout(6000000);
 
   // await page.click("#easy_apply_button");

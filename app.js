@@ -1,8 +1,9 @@
 import express from 'express';
-import { generateWithGemini } from './gemini.js';
+import { generateWithGemini } from './mail_gemini.js';
 import {google} from 'googleapis';
 import dotenv from "dotenv";
 import { GOOGLE_FROM_MAIL, GOOGLE_REFRESH_TOKEN} from './tempConst.js';
+import {answerWithGemini} from './intern_ques_gemini.js';
 
 const app = express();
 
@@ -147,6 +148,22 @@ app.post('/generate-and-send',async(req,res)=>{
     }
 });
 
+// app.get('/custom-answer-with-gemini',async(req,res)=>{
+//   try{
+//     const question = 'why should we hire you?';
+//     const generatedMessage = await answerWithGemini(
+//             question
+//         );
+
+//     console.log(generatedMessage);
+    
+//     return res.status(200).json({message:"Successfully answered by Gemini"});
+
+//   }catch(err){
+//     return res.status(500).json({message:err});
+//   }
+// });
+
 // app.get('/auth/google',async(req,res)=>{
 //     const url = oauth2Client.generateAuthUrl({
 //         // 'online' (default) or 'offline' (gets refresh_token)
@@ -173,7 +190,6 @@ app.post('/generate-and-send',async(req,res)=>{
 //       "Authentication successful"
 //     );
 // });
-
 
 app.listen(port,()=>{
     console.log(`${port} ilistening`);
