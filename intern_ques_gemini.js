@@ -9,7 +9,7 @@ const ai = new GoogleGenAI({
 });
 
 const RESUME_PATH = "/home/kshitiz/Desktop/autoMail/resume/shubhu_res.pdf";
-const MODEL_NAME = "gemini-2.5-flash";
+const MODEL_NAME = "gemini-3.1-flash-lite-preview";
 
 const resumePdfBase64 = fs.readFileSync(RESUME_PATH).toString("base64");
 
