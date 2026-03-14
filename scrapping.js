@@ -1,7 +1,7 @@
 import { chromium } from "playwright";
 import { answerWithGemini } from './intern_ques_gemini.js';
 
-const category = "ai agent development";
+const category = "software development";
 // const url = "net-development,3d-printing,ai-agent-development,asp-net,accounts,acting,aerospace,agriculture-and-food-engineering,analytics,anchoring,android-app-development,angular-js-development,animation,architecture,artificial-intelligence-ai,audio-making-editing,auditing,automobile-engineering,backend-development,bank,big-data,bioinformatics,biology,biotech,blockchain-development,blogging,brand-management,business-development,mba,ca-articleship,cad-design,civil,cloud-computing,computer-science,computer-vision,cyber-security,data-entry,data-science,database-building,electrical,flutter-development,front-end-development,full-stack-development,java,javascript-development,mlops-engineering,machine-learning,natural-language-processing-nlp,node-js-development,search-engine-optimization-seo,software-development,software-testing,web-development,wordpress-development-internship";
 
 const categoryMap = {
@@ -449,21 +449,44 @@ async function applyToInternships(applyLinks, context) {
   await loginInternshala(page);
   
   const categoryLink = await getInternshalaLink(category);
-
+  
   await page.goto(categoryLink, {
     waitUntil: "domcontentloaded"
   });
 
 
-  let scrollState = { keepScrolling: true };
-  // not wait even async call
-  const scrollTask = smoothScroll(page, scrollState);
-
+  // get details from each page
+  let pages = 1;
   const applyLinks = [];
-  await detailsFromJobCards(page, applyLinks);
+  while (true) {
+    let scrollState = { keepScrolling: true };
+    // not wait even async call
+    const scrollTask = smoothScroll(page, scrollState);
 
-  scrollState.keepScrolling = false;
-  await scrollTask;
+    const nextButton = page.locator('.next_page:visible').first();
+
+    await detailsFromJobCards(page, applyLinks);
+
+    scrollState.keepScrolling = false;
+    await scrollTask;
+
+    if (!(await nextButton.count())) break;
+
+    const className = await nextButton.getAttribute('class');
+    if (className?.includes('disabled')) break;
+
+    await nextButton.click();
+
+    // wait for page content to update
+    await page.waitForTimeout(1000); 
+    pages++;
+  }
+
+  // const applyLinks = [];
+
+  // for(let pageNo=1;pageNo<=noOfPages;pageNo++){
+    // await detailsFromJobCards(page, applyLinks);
+  // }
 
   // apply to the link:
   await applyToInternships(applyLinks, context);
