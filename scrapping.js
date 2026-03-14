@@ -1,7 +1,7 @@
 import { chromium } from "playwright";
 import { answerWithGemini } from './intern_ques_gemini.js';
 
-const category = "backend development";
+const category = "ai agent development";
 // const url = "net-development,3d-printing,ai-agent-development,asp-net,accounts,acting,aerospace,agriculture-and-food-engineering,analytics,anchoring,android-app-development,angular-js-development,animation,architecture,artificial-intelligence-ai,audio-making-editing,auditing,automobile-engineering,backend-development,bank,big-data,bioinformatics,biology,biotech,blockchain-development,blogging,brand-management,business-development,mba,ca-articleship,cad-design,civil,cloud-computing,computer-science,computer-vision,cyber-security,data-entry,data-science,database-building,electrical,flutter-development,front-end-development,full-stack-development,java,javascript-development,mlops-engineering,machine-learning,natural-language-processing-nlp,node-js-development,search-engine-optimization-seo,software-development,software-testing,web-development,wordpress-development-internship";
 
 const categoryMap = {
@@ -128,6 +128,7 @@ async function loginInternshala(page){
 
 async function getInternshalaLink(category) {
   const slug = categoryMap[category.toLowerCase().trim()];
+  console.log(slug);
   if (!slug) {
     throw new Error("Invalid Category");
   }
@@ -149,7 +150,7 @@ async function detailsFromJobCards(page, applyLinks) {
   console.log("Total internships found:", count);
 
 
-  for (let i = 0; i < count - 40; i++) {
+  for (let i = 0; i < count; i++) {
 
     const title = await jobTitles.nth(i).textContent();
     const company = await companies.nth(i).textContent();
@@ -467,8 +468,8 @@ async function applyToInternships(applyLinks, context) {
   // apply to the link:
   await applyToInternships(applyLinks, context);
 
-  page.close();
-  context.close();
+  // page.close();
+  // context.close();
 
   console.log("Operation Successfull");
 
