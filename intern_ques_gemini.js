@@ -1,81 +1,156 @@
 import { GoogleGenAI } from "@google/genai";
-import 'dotenv/config';
+import "dotenv/config";
 import fs from "fs";
-const apiKey=process.env.GEMINI_API_KEY;
+
+const apiKey = process.env.GEMINI_API_KEY;
 
 const ai = new GoogleGenAI({
-  httpOptions: { apiVersion: "v1alpha" },
+  apiKey,
 });
 
-const answerWithGemini = async(question) =>{
-    try{
-    
-    console.log(question);
+const RESUME_PATH = "/home/kshitiz/Desktop/autoMail/resume/shubhu_res.pdf";
+const MODEL_NAME = "gemini-2.5-flash";
 
-    const pdfBytes = fs.readFileSync(
-        "/home/kshitiz/Desktop/autoMail/resume/shubhu_res.pdf"
-    );
+const resumePdfBase64 = fs.readFileSync(RESUME_PATH).toString("base64");
 
-    // const contents = [
-    //     {
-    //         inlineData: {
-    //             mimeType: 'application/pdf',
-    //             data: pdfBytes.toString("base64")
-    //         }
-    //     },
-    //     { text: `Based on the resume answer the below question in a about 2-4 lines
-    //         only until not mentioned explicitly: 
-    //         Question: ${question}
-    //         If asked for link to your portfolio/work samples provide the link of github
-    //         from resume` 
-    //     }
-    // ];
+const buildQuestionAnswerPrompt = (question) => `
+You are helping a candidate answer job application questions using the resume provided.
 
-    const contents = [
-    {
-        inlineData: {
+Your task is to write answers that sound like they were written directly by the applicant.
+
+RULES:
+- Write in FIRST PERSON (I, my, me).
+- Never say "the resume mentions", "according to the resume", or anything referring to the resume.
+- Never say "Not mentioned in the resume".
+- If the resume does not contain the exact information, provide a short neutral response such as:
+  - "I have not worked directly on this yet, but I am eager to learn and adapt quickly."
+  - "I don't have direct experience with this, but I am comfortable learning new tools and technologies."
+
+STYLE:
+- Professional but natural.
+- Concise (2–4 lines maximum).
+- No AI-style explanations.
+- No headings.
+- No bullet points.
+
+SPECIAL RULES:
+- If the question asks for a project example, describe one project from the resume naturally.
+- If a portfolio, GitHub, or work sample is requested, include the GitHub link from the resume.
+- If asked about availability, answer positively and clearly.
+
+OUTPUT:
+Return ONLY the answer text that should be placed in the application form.
+
+QUESTION:
+${question}
+`;
+
+const buildOptionSelectionPrompt = (question) => `
+You are filling a job application form.
+
+Question:
+${question}
+
+Return ONLY the best matching options from the list above.
+Return them as a JSON array.
+
+Example:
+["Python", "JavaScript"]
+`;
+
+const answerWithGemini = async (question1, question2,JD) => {
+  try {
+    if (question1) {
+      const contents = [
+        {
+          inlineData: {
             mimeType: "application/pdf",
-            data: pdfBytes.toString("base64")
-        }
+            data: resumePdfBase64,
+          },
+        },
+        {
+          text: buildQuestionAnswerPrompt(question1),
+        },
+      ];
+
+      const response = await ai.models.generateContent({
+        model: MODEL_NAME,
+        contents,
+      });
+
+      return response.text;
+    }
+
+    if (question2) {
+      const contents = [
+        {
+          inlineData: {
+            mimeType: "application/pdf",
+            data: resumePdfBase64,
+          },
+        },
+        {
+          text: buildOptionSelectionPrompt(question2),
+        },
+      ];
+
+      const response = await ai.models.generateContent({
+        model: MODEL_NAME,
+        contents,
+      });
+
+      return response.text;
+    }
+
+    if (JD) {
+  const contents = [
+    {
+      inlineData: {
+        mimeType: "application/pdf",
+        data: resumePdfBase64,
+      },
     },
     {
-        text: `
-            You are answering job application questions based strictly on the provided resume.
+      text: `
+Write a tailored cover letter using the attached resume and the job description below.
 
-            INSTRUCTIONS:
-            - Use only information that appears in the resume.
-            - Do NOT invent or assume information.
-            - Keep the answer concise (2–4 lines maximum).
-            - Write in a professional tone suitable for job applications.
+Job Description:
+${JD}
 
-            SPECIAL RULE:
-            - If the question asks for portfolio, projects, or work samples, provide the GitHub link found in the resume.
+Constraints:
+1. Use the resume as the primary source of truth.
+2. Tailor the letter to the job description.
+3. Do not hallucinate qualifications, metrics, employers, education, or tools.
+4. Do not use vague filler like "I am writing to express my interest" unless naturally phrased.
+5. Avoid overly formal or robotic language.
+6. Keep it between 220 and 320 words.
+7. Make it specific, credible, and polished.
+8. No bullet points, no headings, no placeholders, no markdown.
+9. Output only the cover letter.
 
-            If the information is not present in the resume, respond with:
-            "Not mentioned in the resume."
+The cover letter should:
+- briefly introduce the candidate,
+- connect their relevant background to the role,
+- highlight 2 to 4 strong matches between resume and JD,
+- show genuine interest in the opportunity,
+- close professionally.
+      `.trim(),
+    },
+  ];
 
-            QUESTION:
-            ${question}
-            `
-        }
-    ];
+  const response = await ai.models.generateContent({
+    model: MODEL_NAME,
+    contents,
+  });
 
-    const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: contents
-    });
-
-    // console.log(response.text);
-
-    return response.text;
-
-    }catch(err){
-        console.log("Its error:",err);
-        return res.status(500).json({message:'Server Error'});
-    }
+  return response.text?.trim();
 }
 
+    return "No question provided.";
+  } catch (err) {
+    console.error("Error in answerWithGemini:", err);
+    throw new Error("Failed to generate content");
+  }
+};
 
-// console.log(interaction.outputs[interaction.outputs.length - 1].text);
-
-export {answerWithGemini};
+export { answerWithGemini };

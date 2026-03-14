@@ -1,7 +1,7 @@
 import { chromium } from "playwright";
 import {answerWithGemini} from './intern_ques_gemini.js';
 
-const category = "software development";
+const category = "backend development";
 // const url = "net-development,3d-printing,ai-agent-development,asp-net,accounts,acting,aerospace,agriculture-and-food-engineering,analytics,anchoring,android-app-development,angular-js-development,animation,architecture,artificial-intelligence-ai,audio-making-editing,auditing,automobile-engineering,backend-development,bank,big-data,bioinformatics,biology,biotech,blockchain-development,blogging,brand-management,business-development,mba,ca-articleship,cad-design,civil,cloud-computing,computer-science,computer-vision,cyber-security,data-entry,data-science,database-building,electrical,flutter-development,front-end-development,full-stack-development,java,javascript-development,mlops-engineering,machine-learning,natural-language-processing-nlp,node-js-development,search-engine-optimization-seo,software-development,software-testing,web-development,wordpress-development-internship";
 
 const categoryMap = {
@@ -60,6 +60,30 @@ const categoryMap = {
   "web development": "web-development",
   "wordpress development": "wordpress-development"
 };
+
+function getLongestCommonSubstring(a, b) {
+  const m = a.length;
+  const n = b.length;
+
+  const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  let maxLen = 0;
+  let endIndex = 0;
+
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (a[i - 1] === b[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+
+        if (dp[i][j] > maxLen) {
+          maxLen = dp[i][j];
+          endIndex = i;
+        }
+      }
+    }
+  }
+
+  return a.slice(endIndex - maxLen, endIndex).trim();
+}
 
 function getInternshalaLink(category){
   const slug = categoryMap[category.toLowerCase().trim()];
@@ -209,13 +233,16 @@ console.log("\nCollected Apply Links:\n");
 
 for (const link of applyLinks) {
   // open extracted link:
+  
   const jobPage = await context.newPage();
   await jobPage.goto(link,{ waitUntil: "domcontentloaded" });
+  // jobPage.waitForTimeout(10 * 60 * 100000);
 
   const applyBtn = jobPage.locator('#top_easy_apply_button');
   const applyBtn2 = jobPage.locator('.apply_now_btn');
 
   if (await applyBtn2.isDisabled()) {
+    console.log("Already Applied!");
     continue;
   }
 
@@ -225,6 +252,48 @@ for (const link of applyLinks) {
   } else {
     console.log("Apply button not found");
   }
+
+// Check ask for cover letter:
+const coverLetter = jobPage.locator('.cover_letter_container');
+
+if(await coverLetter.count()>0){
+
+console.log("Cover Letter question present");
+const jobSummary = jobPage.locator('.job_summary');
+const sectionDivs = jobSummary.locator(':scope > div');
+
+const sectionCount = await sectionDivs.count();
+const allLiTexts = [];
+
+for (let i = 0; i < sectionCount; i++) {
+  const section = sectionDivs.nth(i);
+  const ulItems = section.locator('ul');
+  const liItems = ulItems.locator('li');
+  const liCount = await liItems.count();
+
+  for (let j = 0; j < liCount; j++) {
+    const text = (await liItems.nth(j).textContent())?.trim();
+    if (text) {
+      allLiTexts.push(text);
+    }
+  }
+}
+
+const finalText = allLiTexts.join('\n');
+console.log(finalText);
+
+const ansCL = await answerWithGemini(null,null,finalText);
+console.log(ansCL);
+
+const visibleEditor = coverLetter.locator('#cover_letter_holder');
+
+await visibleEditor.click();
+await jobPage.keyboard.press('Control+A');
+await jobPage.keyboard.press('Backspace');
+await jobPage.keyboard.type(ansCL, { delay: 5 });
+
+}
+
 
 // confirmation availability question set to YES
 const availabilityOption = jobPage.locator('#confirm_availability_container label').first();
@@ -236,6 +305,7 @@ if (await availabilityOption.count() > 0) {
   console.log("Availability option not present");
 }
 
+
 // check whether additional question present or not ?
 
 const availabilityOfAdditionalQues=jobPage.locator('.additional_question');
@@ -245,7 +315,7 @@ if(await availabilityOfAdditionalQues.count()>0){
   //count no.of question present:
   // const questCount = await availabilityOfAdditionalQues.count();
 
-  // Additional question - three types:
+  // Additional question - four types:
   const questions = jobPage.locator('.form-group.additional_question');
 const questCount = await questions.count();
 
@@ -256,6 +326,7 @@ const questCount = await questions.count();
 
   const optionQues = questionBlock.locator('.custom_question_boolean_container');
   const rangeSelect = questionBlock.locator('select.custom_question_range');
+  const multipleOptQues = questionBlock.locator('.custom_question_mcq_container');
   const textQues = questionBlock.locator('.assessment_question label');
 
   // TYPE 1: Option question
@@ -264,45 +335,121 @@ const questCount = await questions.count();
     console.log("Option based question present");
   }
 
-  // // TYPE 2: Range question
-  // else if (await rangeSelect.count() > 0) {
+  // TYPE 2: Range question
+else if (await rangeSelect.count() > 0) {
 
-  //   const options = rangeSelect.locator('option:not([disabled])');
-  //   const count = await options.count();
+  const options = rangeSelect.locator('option:not([disabled])');
+  const count = await options.count();
 
-  //   const lastValue = await options.nth(count - 1).getAttribute('value');
+  const lastValue = await options.nth(count - 1).getAttribute('value');
 
-  //   await rangeSelect.selectOption(lastValue);
+  await rangeSelect.evaluate((el, value) => {
+    el.value = value;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }, lastValue);
 
-  //   console.log("Range question answered with:", lastValue);
-  // }
+  console.log("Range question answered with:", lastValue);
+}
+// TYPE-3: multiple questions:
+else if (await multipleOptQues.count() > 0) {
+  console.log("HELLO");
 
-  // TYPE 3: Text question
+  const question2 = await textQues.innerText();
+  const geminiAnswers = await answerWithGemini(null, question2,null);
+
+  console.log("Question:", question2);
+  console.log("Gemini raw:", geminiAnswers);
+
+  let matchedSet = new Set();
+
+  try {
+    const matchedValues = JSON.parse(geminiAnswers)
+      .filter(v => typeof v === "string")
+      .map(v => v.trim().toLowerCase());
+
+    matchedSet = new Set(matchedValues);
+    console.log("Matched values:", [...matchedSet]);
+  } catch (error) {
+    console.log("Failed to parse Gemini response:", error.message);
+  }
+
+  const optionLabels = multipleOptQues.locator('.checkbox label');
+  const labelCount = await optionLabels.count();
+  console.log("Total labels found:", labelCount);
+
+  for (let i = 0; i < labelCount; i++) {
+    const label = optionLabels.nth(i);
+    const labelText = (await label.textContent())?.trim().toLowerCase();
+
+    if (!labelText) continue;
+
+    let bestMatch = "";
+    let bestAnswer = "";
+
+    for (const answer of matchedSet) {
+      const commonSubstring = getLongestCommonSubstring(answer, labelText);
+
+      if (commonSubstring.length > bestMatch.length) {
+        bestMatch = commonSubstring;
+        bestAnswer = answer;
+      }
+    }
+
+    console.log(`Option ${i}: ${labelText}`);
+    console.log(`Best common substring: "${bestMatch}" with "${bestAnswer}"`);
+
+    if (bestAnswer) {
+      const ratio = bestMatch.length / bestAnswer.length;
+
+      if (bestMatch.length >= 4 && ratio >= 0.6) {
+        await label.click();
+        console.log(`Clicked: ${labelText}`);
+      }
+    }
+  }
+}
+  // TYPE 4: Text question
   else if (await textQues.count() > 0) {
 
-    const question = await textQues.innerText();
+    const question1 = await textQues.innerText();
 
-    const generatedAnswer = await answerWithGemini(question);
+    const generatedAnswer = await answerWithGemini(question1,null,null);
 
-    console.log("Custom question:", question);
+    console.log("Custom question:", question1);
     console.log("Gemini answer:", generatedAnswer);
 
     const textarea = questionBlock.locator('textarea');
 
     await textarea.fill(generatedAnswer);
   }
+
+  
 }
 }else{
   console.log("No additional questions available")
 }
+// await page.waitForSelector("a.apply_now_button",{ timeout: 12000000 });
 
-const submitbtn = jobPage.locator('.submit_button_container');
+// const submitbtn = jobPage.locator('.submit_button_container');
 
-await submitbtn.click();
+// await submitbtn.click();
+
+try {
+    const submitbtn = jobPage.locator('.submit_button_container');
+
+    await submitbtn.waitFor({ state: 'visible', timeout: 5000 });
+    await submitbtn.click();
+
+    console.log("Application submitted");
+} catch (error) {
+    console.log("Submit button not found or clickable. Pausing script...");
+
+    // pause for long time (e.g., 10 minutes)
+    await jobPage.waitForTimeout(10 * 60 * 1000);
+}
 
 await randomWait(jobPage);
 
-  // await page.waitForSelector("a.apply_now_button",{ timeout: 12000000 });
   // page.setDefaultNavigationTimeout(6000000);
 
   // await page.click("#easy_apply_button");
