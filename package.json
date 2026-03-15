@@ -17,6 +17,7 @@
     "express": "^5.2.1",
     "googleapis": "^105.0.0",
     "http-server": "^14.1.1",
+    "node-latex": "^3.1.0",
     "nodemon": "^3.1.14",
     "ollama": "^0.6.3",
     "playwright": "^1.58.2"

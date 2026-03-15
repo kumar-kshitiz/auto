@@ -1,7 +1,8 @@
 import { chromium } from "playwright";
-import { answerWithGemini } from './intern_ques_gemini.js';
+import { answerWithGemini,generateLatexCode } from './intern_ques_gemini.js';
+import {compileLatexResume} from './compile_resume.js';
 
-const category = "software development";
+const category = "node js development";
 // const url = "net-development,3d-printing,ai-agent-development,asp-net,accounts,acting,aerospace,agriculture-and-food-engineering,analytics,anchoring,android-app-development,angular-js-development,animation,architecture,artificial-intelligence-ai,audio-making-editing,auditing,automobile-engineering,backend-development,bank,big-data,bioinformatics,biology,biotech,blockchain-development,blogging,brand-management,business-development,mba,ca-articleship,cad-design,civil,cloud-computing,computer-science,computer-vision,cyber-security,data-entry,data-science,database-building,electrical,flutter-development,front-end-development,full-stack-development,java,javascript-development,mlops-engineering,machine-learning,natural-language-processing-nlp,node-js-development,search-engine-optimization-seo,software-development,software-testing,web-development,wordpress-development-internship";
 
 const categoryMap = {
@@ -60,6 +61,15 @@ const categoryMap = {
   "web development": "web-development",
   "wordpress development": "wordpress-development"
 };
+
+function isValidUrl(link) {
+  try {
+    new URL(link);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 async function randomWait(page, min = 1000, max = 3000) {
   const delay = Math.floor(Math.random() * (max - min + 1)) + min;
@@ -150,7 +160,7 @@ async function detailsFromJobCards(page, applyLinks) {
   console.log("Total internships found:", count);
 
 
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < count-30; i++) {
 
     const title = await jobTitles.nth(i).textContent();
     const company = await companies.nth(i).textContent();
@@ -187,33 +197,10 @@ async function detailsFromJobCards(page, applyLinks) {
   }
 }
 
-async function fillCoverLetter(jobPage, coverLetter) {
-
+async function fillCoverLetter(jobPage, coverLetter,JD) {
   console.log("Cover Letter question present");
-  const jobSummary = jobPage.locator('.job_summary');
-  const sectionDivs = jobSummary.locator(':scope > div');
 
-  const sectionCount = await sectionDivs.count();
-  const allLiTexts = [];
-
-  for (let i = 0; i < sectionCount; i++) {
-    const section = sectionDivs.nth(i);
-    const ulItems = section.locator('ul');
-    const liItems = ulItems.locator('li');
-    const liCount = await liItems.count();
-
-    for (let j = 0; j < liCount; j++) {
-      const text = (await liItems.nth(j).textContent())?.trim();
-      if (text) {
-        allLiTexts.push(text);
-      }
-    }
-  }
-
-  const finalText = allLiTexts.join('\n');
-  console.log(finalText);
-
-  const ansCL = await answerWithGemini(null, null, finalText);
+  const ansCL = await answerWithGemini(null, null, JD);
   console.log(ansCL);
 
   const visibleEditor = coverLetter.locator('#cover_letter_holder');
@@ -353,13 +340,55 @@ async function submitApplication(jobPage) {
   await randomWait(jobPage);
 }
 
-async function applyToInternships(applyLinks, context) {
+async function extractJD(jobPage){
+  const jobSummary = jobPage.locator('.job_summary');
+  const sectionDivs = jobSummary.locator(':scope > div');
 
+  const sectionCount = await sectionDivs.count();
+  const allLiTexts = [];
+
+  for (let i = 0; i < sectionCount; i++) {
+    const section = sectionDivs.nth(i);
+    const ulItems = section.locator('ul');
+    const liItems = ulItems.locator('li');
+    const liCount = await liItems.count();
+
+    for (let j = 0; j < liCount; j++) {
+      const text = (await liItems.nth(j).textContent())?.trim();
+      if (text) {
+        allLiTexts.push(text);
+      }
+    }
+  }
+
+  const finalText = allLiTexts.join('\n');
+  console.log(finalText);
+  return finalText;
+}
+
+async function modifyResume(JD,count){
+  const generated_latex = await generateLatexCode(JD);
+  await compileLatexResume(generated_latex,count);
+}
+
+async function applyToInternships(applyLinks, context) {
+  let count = 0;
   for (const link of applyLinks) {
-    // open extracted link:
+    
+    //check link validity
+    if (!isValidUrl(link)) {
+      console.log(`Skipping malformed URL: ${link}`);
+      continue;
+    }
 
     const jobPage = await context.newPage();
-    await jobPage.goto(link, { waitUntil: "domcontentloaded" });
+    try{
+      // open extracted link:
+      await jobPage.goto(link, { waitUntil: "domcontentloaded" });
+    }catch(err){
+      console.log(`Skipping broken link: ${link}`);
+    }
+    
     // jobPage.waitForTimeout(10 * 60 * 100000);
 
     const applyBtn = jobPage.locator('#top_easy_apply_button');
@@ -381,11 +410,13 @@ async function applyToInternships(applyLinks, context) {
       console.log("Apply button not found");
     }
 
+    // Extract JD:
+    const JD = await extractJD(jobPage);
     // Check ask for cover letter:
     const coverLetter = jobPage.locator('.cover_letter_container');
 
     if (await coverLetter.count() > 0) {
-      await fillCoverLetter(jobPage, coverLetter);
+      await fillCoverLetter(jobPage, coverLetter,JD);
     }
 
     // confirmation availability question set to YES
@@ -415,6 +446,9 @@ async function applyToInternships(applyLinks, context) {
     } else {
       console.log("No additional questions available")
     }
+
+    count++;
+    await modifyResume(JD,count);
     // await page.waitForSelector("a.apply_now_button",{ timeout: 12000000 });
 
     //submit application
