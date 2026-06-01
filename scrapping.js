@@ -1,8 +1,8 @@
 import { chromium } from "playwright";
 import { answerWithGemini,generateLatexCode } from './intern_ques_gemini.js';
 import {compileLatexResume} from './compile_resume.js';
+import fs from 'fs';
 
-const category = "node js development";
 // const url = "net-development,3d-printing,ai-agent-development,asp-net,accounts,acting,aerospace,agriculture-and-food-engineering,analytics,anchoring,android-app-development,angular-js-development,animation,architecture,artificial-intelligence-ai,audio-making-editing,auditing,automobile-engineering,backend-development,bank,big-data,bioinformatics,biology,biotech,blockchain-development,blogging,brand-management,business-development,mba,ca-articleship,cad-design,civil,cloud-computing,computer-science,computer-vision,cyber-security,data-entry,data-science,database-building,electrical,flutter-development,front-end-development,full-stack-development,java,javascript-development,mlops-engineering,machine-learning,natural-language-processing-nlp,node-js-development,search-engine-optimization-seo,software-development,software-testing,web-development,wordpress-development-internship";
 
 const categoryMap = {
@@ -146,21 +146,21 @@ async function getInternshalaLink(category) {
 }
 
 async function detailsFromJobCards(page, applyLinks) {
-  const jobTitles = page.locator("h3.job-internship-name");
+  const jobTitles = page.locator("h2.job-internship-name");
   const companies = page.locator("p.company-name");
   const locations = page.locator(".locations span a");
   const stipends = page.locator("span.stipend");
   const durations = page.locator(".ic-16-calendar + span");
   const postedAt = page.locator(".ic-16-reschedule + span");
   const ppoStatus = page.locator(".ppo_status span span");
-  const link = page.locator("h3.job-internship-name a");
+  const link = page.locator("h2.job-internship-name a");
 
   // const count = page.locator(".individual_internship");
   const count = await jobTitles.count();
   console.log("Total internships found:", count);
 
 
-  for (let i = 0; i < count-30; i++) {
+  for (let i = 0; i < count; i++) {
 
     const title = await jobTitles.nth(i).textContent();
     const company = await companies.nth(i).textContent();
@@ -179,21 +179,22 @@ async function detailsFromJobCards(page, applyLinks) {
     }
 
     const applyLink = await link.nth(i).getAttribute("href");
+    console.log(applyLink);
 
-    const fullLink = "https://internshala.com" + applyLink;
-
-    applyLinks.push(fullLink);
-
-    await randomWait(page);
-
-    console.log("Job:", title);
-    console.log("Company:", company);
-    console.log("Location:", location);
-    console.log("Stipend:", stipend);
-    console.log("Duration:", duration);
-    console.log("Posted:", postago);
-    console.log("PPO:", ppoOffered);
-    console.log("----------------");
+    if(applyLink.startsWith('/internship')){
+      const fullLink = "https://internshala.com" + applyLink;
+      applyLinks.push(fullLink);
+      await randomWait(page);
+      console.log("Job:", title);
+      console.log("Company:", company);
+      console.log("Location:", location);
+      console.log("Stipend:", stipend);
+      console.log("Duration:", duration);
+      console.log("Posted:", postago);
+      console.log("PPO:", ppoOffered);
+      console.log("----------------");
+    }
+    
   }
 }
 
@@ -223,8 +224,45 @@ async function fillUpQuestions(jobPage,questCount, questions) {
 
     // TYPE 1: Option question
     if (await optionQues.count() > 0) {
-      await optionQues.locator('label').first().click();
-      console.log("Option based question present");
+      const questionText = await textQues.innerText();
+      const optionLabels = optionQues.locator('label');
+      const labelCount = await optionLabels.count();
+      let optionsList = [];
+      for (let j = 0; j < labelCount; j++) {
+        optionsList.push(await optionLabels.nth(j).innerText());
+      }
+
+      fs.writeFileSync('scraper_state.json', JSON.stringify({
+         status: 'waiting_input',
+         question: questionText,
+         options: optionsList
+      }));
+
+      console.log("Waiting for user input from UI...");
+      let answer = null;
+      while (true) {
+         await jobPage.waitForTimeout(2000);
+         try {
+           const state = JSON.parse(fs.readFileSync('scraper_state.json', 'utf8'));
+           if (state.status === 'answered') {
+               answer = state.answer;
+               break;
+           }
+         } catch (e) {
+           // Ignore parse errors (file might be writing)
+         }
+      }
+
+      console.log("User answered:", answer);
+      for (let j = 0; j < labelCount; j++) {
+         const labelText = await optionLabels.nth(j).innerText();
+         if (labelText === answer) {
+             await optionLabels.nth(j).click();
+             break;
+         }
+      }
+
+      fs.writeFileSync('scraper_state.json', JSON.stringify({ status: 'running' }));
     }
 
     // TYPE 2: Range question
@@ -366,10 +404,10 @@ async function extractJD(jobPage){
   return finalText;
 }
 
-async function modifyResume(JD,count){
-  const generated_latex = await generateLatexCode(JD);
-  await compileLatexResume(generated_latex,count);
-}
+// async function modifyResume(JD,count){
+//   const generated_latex = await generateLatexCode(JD);
+//   await compileLatexResume(generated_latex,count);
+// }
 
 async function applyToInternships(applyLinks, context) {
   let count = 0;
@@ -448,7 +486,7 @@ async function applyToInternships(applyLinks, context) {
     }
 
     count++;
-    await modifyResume(JD,count);
+    // await modifyResume(JD,count);
     // await page.waitForSelector("a.apply_now_button",{ timeout: 12000000 });
 
     //submit application
@@ -458,9 +496,9 @@ async function applyToInternships(applyLinks, context) {
   }
 }
 
-(async () => {
-
+export async function runScraper(category) {
   console.log("Starting bot...");
+  fs.writeFileSync('scraper_state.json', JSON.stringify({ status: 'running' }));
 
   // Dedicated persistent profile
   const context = await chromium.launchPersistentContext("./chrome-profile", {
@@ -529,5 +567,5 @@ async function applyToInternships(applyLinks, context) {
   // context.close();
 
   console.log("Operation Successfull");
-
-})();
+  return { success: true, message: "Operation Successfull" };
+}

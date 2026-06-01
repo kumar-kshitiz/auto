@@ -8,7 +8,7 @@ const ai = new GoogleGenAI({
   apiKey,
 });
 
-const RESUME_PATH = "/home/kshitiz/Desktop/autoMail/resume/shubhu_res.pdf";
+const RESUME_PATH = "/home/kshitiz/Desktop/autoMail/resume/updatedResume.pdf";
 const MODEL_NAME = "gemini-3.1-flash-lite-preview";
 
 const resumePdfBase64 = fs.readFileSync(RESUME_PATH).toString("base64");

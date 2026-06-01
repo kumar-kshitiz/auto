@@ -4,9 +4,10 @@ import {google} from 'googleapis';
 import dotenv from "dotenv";
 import { GOOGLE_FROM_MAIL, GOOGLE_REFRESH_TOKEN} from './tempConst.js';
 import {answerWithGemini} from './intern_ques_gemini.js';
+import { runScraper } from './scrapping.js';
 
 const app = express();
-
+7
 dotenv.config();
 const port=process.env.PORT;
 
@@ -77,6 +78,7 @@ const sendMail = async({to,subject,message})=>{
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static('public'));
 
 app.get('/',(req,res)=>{
     res.json('working');
@@ -145,6 +147,23 @@ app.post('/generate-and-send',async(req,res)=>{
 
     }catch(err){
         res.status(500).json({message:err});
+    }
+});
+
+app.post('/api/scrape', async (req, res) => {
+    try {
+        const { category } = req.body;
+        if (!category) {
+            return res.status(400).json({ success: false, message: "Category is required" });
+        }
+        
+        console.log(`Starting scrape for category: ${category}`);
+        // Run in background
+        runScraper(category).catch(console.error);
+        
+        return res.json({ success: true, message: `Scraping started for category: ${category}. Check terminal for logs.` });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
     }
 });
 
