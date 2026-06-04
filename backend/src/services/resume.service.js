@@ -9,22 +9,22 @@ const prisma = new PrismaClient();
 const CONFIG = {
   geminiApiKey: process.env.GEMINI_API_KEY || "",
   serpApiKey: process.env.SERPAPI_KEY || process.env.SERP_API_KEY || "",
-  model: "gemini-3.5-flash",
-  maxResults: 10,
-  resultsPerQuery: 5,
+  model: "gemini-3.1-flash-lite",
+  maxResults: 2,
+  resultsPerQuery: 2
 };
 
 const JOB_PORTALS = [
-  // { name: "LinkedIn India", site: "linkedin.com/jobs" },
-  { name: "Naukri", site: "naukri.com" },
-  // { name: "Internshala", site: "internshala.com" },
-  { name: "Indeed India", site: "in.indeed.com" },
-  { name: "Shine", site: "shine.com" },
-  { name: "Foundit (Monster)", site: "foundit.in" },
-  { name: "IIMJobs", site: "iimjobs.com" },
-  { name: "Hirist (Tech)", site: "hirist.tech" },
-  { name: "Wellfound", site: "wellfound.com" },
-  { name: "Cutshort", site: "cutshort.io" },
+  { name: "LinkedIn India", site: "linkedin.com", inurl: "/jobs/view/" },
+  { name: "Naukri", site: "naukri.com", inurl: "job-listings" },
+  // { name: "Internshala", site: "internshala.com", inurl: "detail" },
+  { name: "Indeed India", site: "in.indeed.com", inurl: "viewjob" },
+  { name: "Shine", site: "shine.com", inurl: "/jobs/" },
+  { name: "Foundit (Monster)", site: "foundit.in", inurl: "/job/" },
+  { name: "IIMJobs", site: "iimjobs.com", inurl: "/j/" },
+  { name: "Hirist (Tech)", site: "hirist.tech", inurl: "/j/" },
+  { name: "Wellfound", site: "wellfound.com", inurl: "jobs" },
+  { name: "Cutshort", site: "cutshort.io", inurl: "/job/" },
 ];
 
 function getGemini() {
@@ -149,8 +149,9 @@ async function fetchJobUrls(queries, profile) {
 
   for (const portal of topPortals) {
     for (const query of topQueries) {
+      const q = `site:${portal.site} inurl:${portal.inurl} ${query}`;
       searches.push(
-        searchSerpAPI(query, portal.site)
+        searchSerpAPI(q)
           .then((results) => results.map((r) => ({ ...r, portalName: portal.name })))
           .catch(() => [])
       );
@@ -158,8 +159,9 @@ async function fetchJobUrls(queries, profile) {
   }
 
   for (const query of queries) {
+    const q = `${query} (site:naukri.com inurl:job-listings OR site:linkedin.com inurl:/jobs/view/ OR site:in.indeed.com inurl:viewjob)`;
     searches.push(
-      searchSerpAPI(`${query} (site:naukri.com OR site:internshala.com OR site:linkedin.com/jobs OR site:in.indeed.com)`)
+      searchSerpAPI(q)
         .then((results) => results.map((r) => ({ ...r, portalName: detectPortal(r.url) })))
         .catch(() => [])
     );
@@ -169,16 +171,31 @@ async function fetchJobUrls(queries, profile) {
   const seen = new Set();
   const allResults = [];
 
+  // Strict regex patterns to ensure the URL is a single JD, not a search list.
+  const isValidJD = (url) => {
+    const u = url.toLowerCase();
+    if (u.includes("linkedin.com")) return u.includes("/jobs/view/") || u.includes("currentjobid=");
+    if (u.includes("naukri.com")) return u.includes("job-listings") || /-job-[a-z0-9]+$/.test(u);
+    if (u.includes("internshala.com")) return u.includes("/detail");
+    if (u.includes("indeed.com")) return u.includes("viewjob") || u.includes("jk=");
+    if (u.includes("shine.com")) return u.includes("/jobs/") && !u.endsWith("/jobs/");
+    if (u.includes("foundit.in")) return u.includes("/job/");
+    if (u.includes("iimjobs.com") || u.includes("hirist.tech")) return u.includes("/j/");
+    if (u.includes("wellfound.com")) return u.includes("/jobs/") && !u.endsWith("/jobs/");
+    if (u.includes("cutshort.io")) return u.includes("/job/");
+    return true; // if it's an unknown portal, let it through
+  };
+
   for (const outcome of settled) {
     if (outcome.status !== "fulfilled") continue;
     for (const job of outcome.value) {
-      if (job.url && !seen.has(job.url)) {
+      if (job.url && !seen.has(job.url) && isValidJD(job.url)) {
         seen.add(job.url);
         allResults.push(job);
       }
     }
   }
-  console.log(` \${allResults.length} unique raw results collected`);
+  console.log(`   ${allResults.length} unique raw JD results collected`);
   return allResults;
 }
 
