@@ -12,5 +12,7 @@ model Resume {
   filename        String
   extractedText   String
   extractedSkills String
+  extractedProfile String?
+  jobResults      String?
   createdAt       DateTime @default(now())
 }

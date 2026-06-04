@@ -1,7 +1,11 @@
- 'use client';
+'use client';
 
 import React, { useEffect, useState } from 'react';
-import { FileText, CheckCircle2, Calendar, File } from 'lucide-react';
+import { 
+  FileText, CheckCircle2, Calendar, File, 
+  Briefcase, GraduationCap, MapPin, Target,
+  ExternalLink, Sparkles, Award
+} from 'lucide-react';
 import Link from 'next/link';
 
 export default function Dashboard() {
@@ -22,7 +26,7 @@ export default function Dashboard() {
 
   if (!isMounted) return null;
 
-  if (!data) {
+  if (!data || !data.extractedProfile) {
     return (
       <div className="min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center p-4">
         <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center max-w-md w-full">
@@ -42,85 +46,136 @@ export default function Dashboard() {
     );
   }
 
-  const date = new Date(data.createdAt).toLocaleDateString('en-US', {
+  const { extractedProfile, jobResults, filename, createdAt } = data;
+  const date = new Date(createdAt).toLocaleDateString('en-US', {
     year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
   });
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-10">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500 mt-2">View your parsed resume details and extracted skills.</p>
+    <div className="max-w-6xl mx-auto px-4 py-10 space-y-8">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Your Career Matches</h1>
+          <p className="text-gray-500 mt-2 flex items-center">
+            <File className="h-4 w-4 mr-2" />
+            Analyzed {filename} on {date}
+          </p>
+        </div>
+        <Link 
+          href="/" 
+          className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+        >
+          Upload New Resume
+        </Link>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Left Column - Metadata & Skills */}
-        <div className="md:col-span-1 space-y-6">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-100 pb-3 mb-4 flex items-center">
-              <File className="h-5 w-5 mr-2 text-blue-500" />
-              File Details
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Filename</p>
-                <p className="text-sm text-gray-800 mt-1 truncate" title={data.filename}>
-                  {data.filename}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Parsed On</p>
-                <p className="text-sm text-gray-800 mt-1 flex items-center">
-                  <Calendar className="h-4 w-4 mr-1 text-gray-400" />
-                  {date}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Database ID</p>
-                <p className="text-xs text-gray-500 mt-1 truncate font-mono">
-                  {data.id}
-                </p>
-              </div>
+      {/* Profile Summary */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-8 text-white">
+          <h2 className="text-2xl font-bold mb-1">{extractedProfile.name || "Candidate Profile"}</h2>
+          <div className="flex flex-wrap gap-4 mt-4 text-blue-100 text-sm">
+            <div className="flex items-center">
+              <GraduationCap className="h-4 w-4 mr-2" />
+              {extractedProfile.educationLevel} • {extractedProfile.educationDomain}
             </div>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-100 pb-3 mb-4 flex items-center">
-              <CheckCircle2 className="h-5 w-5 mr-2 text-green-500" />
-              Extracted Skills
-            </h3>
-            
-            {data.extractedSkills.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {data.extractedSkills.map((skill, index) => (
-                  <span 
-                    key={index}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-50 text-blue-700 border border-blue-100"
-                  >
-                    {skill}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500 italic">No targeted skills were found in this resume.</p>
-            )}
-          </div>
-        </div>
-
-        {/* Right Column - Text Preview */}
-        <div className="md:col-span-2">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 h-full flex flex-col">
-            <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-100 pb-3 mb-4 flex items-center">
-              <FileText className="h-5 w-5 mr-2 text-gray-500" />
-              Parsed Text Preview
-            </h3>
-            <div className="bg-gray-50 rounded-xl p-4 flex-grow overflow-auto max-h-[600px]">
-              <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans">
-                {data.extractedText}
-              </pre>
+            <div className="flex items-center">
+              <Briefcase className="h-4 w-4 mr-2" />
+              {extractedProfile.yearsOfExperience} years exp. • {extractedProfile.jobType}
+            </div>
+            <div className="flex items-center">
+              <MapPin className="h-4 w-4 mr-2" />
+              {(extractedProfile.preferredLocations || []).join(", ") || "India"}
             </div>
           </div>
         </div>
+        
+        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-3 flex items-center">
+              <Target className="h-4 w-4 mr-2 text-blue-500" />
+              Target Roles
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {(extractedProfile.targetRoles || []).map((role, idx) => (
+                <span key={idx} className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-medium border border-blue-100">
+                  {role}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-3 flex items-center">
+              <Sparkles className="h-4 w-4 mr-2 text-purple-500" />
+              Top Skills
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {(extractedProfile.skills || []).map((skill, idx) => (
+                <span key={idx} className="bg-gray-100 text-gray-700 px-3 py-1 rounded-md text-sm">
+                  {skill}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Job Listings */}
+      <div>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-gray-900 flex items-center">
+            <Briefcase className="h-6 w-6 mr-3 text-indigo-600" />
+            Top Matching Opportunities
+          </h2>
+          <span className="bg-green-100 text-green-800 text-xs font-semibold px-3 py-1 rounded-full">
+            {jobResults?.length || 0} found
+          </span>
+        </div>
+
+        {(!jobResults || jobResults.length === 0) ? (
+          <div className="bg-white rounded-2xl p-12 text-center border border-gray-100 shadow-sm">
+            <h3 className="text-xl font-medium text-gray-800">No strong matches found yet.</h3>
+            <p className="text-gray-500 mt-2">Try updating your resume with more specific skills and roles.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {jobResults.map((job, idx) => (
+              <div key={idx} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow flex flex-col h-full relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green-50 border border-green-100">
+                    <span className="text-green-700 font-bold text-sm">{job.score}</span>
+                  </div>
+                </div>
+                
+                <div className="pr-12 mb-4">
+                  <p className="text-sm text-indigo-600 font-medium mb-1">{job.portal}</p>
+                  <h3 className="text-lg font-bold text-gray-900 leading-tight">
+                    {job.title}
+                  </h3>
+                </div>
+                
+                <div className="flex-grow">
+                  <div className="bg-blue-50/50 rounded-xl p-4 text-sm text-gray-700 mb-6 border border-blue-50">
+                    <p className="flex items-start">
+                      <CheckCircle2 className="h-4 w-4 text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
+                      <span>{job.reason}</span>
+                    </p>
+                  </div>
+                </div>
+                
+                <a 
+                  href={job.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="mt-auto inline-flex items-center justify-center w-full px-4 py-2.5 border border-transparent text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+                >
+                  Apply Now
+                  <ExternalLink className="ml-2 h-4 w-4" />
+                </a>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
