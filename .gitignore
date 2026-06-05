@@ -16,3 +16,5 @@ generated_resume
 wasted.js
 
 /backend/uploads/
+
+/backend/api.search.js/

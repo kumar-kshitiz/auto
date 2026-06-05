@@ -4,13 +4,16 @@ import React, { useEffect, useState } from 'react';
 import { 
   FileText, CheckCircle2, Calendar, File, 
   Briefcase, GraduationCap, MapPin, Target,
-  ExternalLink, Sparkles, Award
+  ExternalLink, Sparkles, Award, Search, Loader2
 } from 'lucide-react';
 import Link from 'next/link';
+import { findJobs } from '../../services/api';
+import toast from 'react-hot-toast';
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [isMounted, setIsMounted] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -23,6 +26,31 @@ export default function Dashboard() {
       }
     }
   }, []);
+
+  const handleFindJobs = async () => {
+    if (!data || !data.id) {
+      toast.error("Resume ID not found. Please upload again.");
+      return;
+    }
+    
+    setIsSearching(true);
+    const toastId = toast.loading("Searching and ranking jobs...");
+    
+    try {
+      const response = await findJobs(data.id);
+      
+      const updatedData = { ...data, jobResults: response.data.jobResults };
+      setData(updatedData);
+      localStorage.setItem('lastParsedResume', JSON.stringify(updatedData));
+      
+      toast.success("Jobs found successfully!", { id: toastId });
+    } catch (error) {
+      console.error("Error finding jobs:", error);
+      toast.error("Failed to find jobs. Try again.", { id: toastId });
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   if (!isMounted) return null;
 
@@ -50,6 +78,21 @@ export default function Dashboard() {
   const date = new Date(createdAt).toLocaleDateString('en-US', {
     year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
   });
+
+  const experienceDisplay = (() => {
+    const exp = extractedProfile.experience;
+    if (exp && typeof exp === 'object' && exp.totalMonths != null) {
+      const years = exp.years || 0;
+      const months = exp.months || 0;
+      if (years > 0 && months > 0) return `${years}y ${months}m`;
+      if (years > 0) return `${years} year${years === 1 ? '' : 's'}`;
+      if (months > 0) return `${months} month${months === 1 ? '' : 's'}`;
+    }
+
+    const raw = extractedProfile.yearsOfExperience;
+    if (typeof raw === 'number') return `${raw} year${raw === 1 ? '' : 's'}`;
+    return `${raw || 0} years`;
+  })();
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10 space-y-8">
@@ -81,7 +124,7 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center">
               <Briefcase className="h-4 w-4 mr-2" />
-              {extractedProfile.yearsOfExperience} years exp. • {extractedProfile.jobType}
+              {experienceDisplay} exp. • {extractedProfile.jobType}
             </div>
             <div className="flex items-center">
               <MapPin className="h-4 w-4 mr-2" />
@@ -134,8 +177,28 @@ export default function Dashboard() {
 
         {(!jobResults || jobResults.length === 0) ? (
           <div className="bg-white rounded-2xl p-12 text-center border border-gray-100 shadow-sm">
-            <h3 className="text-xl font-medium text-gray-800">No strong matches found yet.</h3>
-            <p className="text-gray-500 mt-2">Try updating your resume with more specific skills and roles.</p>
+            <Search className="h-16 w-16 text-indigo-300 mx-auto mb-4" />
+            <h3 className="text-xl font-medium text-gray-800">Ready to find matches?</h3>
+            <p className="text-gray-500 mt-2 mb-6 max-w-md mx-auto">
+              Your profile is parsed and ready. Click below to search for the best job matches based on your skills and experience.
+            </p>
+            <button
+              onClick={handleFindJobs}
+              disabled={isSearching}
+              className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {isSearching ? (
+                <>
+                  <Loader2 className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" />
+                  Searching Jobs...
+                </>
+              ) : (
+                <>
+                  Find Jobs
+                  <Search className="ml-2 h-5 w-5" />
+                </>
+              )}
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

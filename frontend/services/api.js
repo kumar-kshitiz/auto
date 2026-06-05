@@ -18,3 +18,8 @@ export const uploadResume = async (file) => {
 
   return response.data;
 };
+
+export const findJobs = async (resumeId) => {
+  const response = await apiClient.get(`/resume/${resumeId}/jobs`);
+  return response.data;
+};
