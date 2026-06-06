@@ -1,16 +1,14 @@
 import fs from 'fs';
 import pdf from 'pdf-parse';
 import { PrismaClient } from '@prisma/client';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import axios from 'axios';
 import { extractProfile } from './extractProfile.js';
+import { extractJD, scoreResume, checkEligibility } from './rankJobs.js';
 
 const prisma = new PrismaClient();
 
 const CONFIG = {
-  geminiApiKey: process.env.GEMINI_API_KEY || "",
   serpApiKey: process.env.SERPAPI_KEY || process.env.SERP_API_KEY || "",
-  model: "gemini-3.1-flash-lite",
   maxResults: 5,
   resultsPerQuery: 10
 };
@@ -27,25 +25,6 @@ const JOB_PORTALS = [
   { name: "Wellfound", site: "wellfound.com", inurl: "jobs" },
   { name: "Cutshort", site: "cutshort.io", inurl: "/job/" },
 ];
-
-function getGemini() {
-  if (!CONFIG.geminiApiKey) throw new Error("GEMINI_API_KEY is not set");
-  const genAI = new GoogleGenerativeAI(CONFIG.geminiApiKey);
-  return genAI.getGenerativeModel({ model: CONFIG.model });
-}
-
-async function geminiJSON(prompt) {
-  const model = getGemini();
-  const result = await model.generateContent({
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: {
-      responseMimeType: "application/json",
-    },
-  });
-  const text = result.response.text().trim();
-  const clean = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-  return JSON.parse(clean);
-}
 
 const extractTextFromPDF = async (filePath) => {
   const dataBuffer = fs.readFileSync(filePath);
@@ -148,7 +127,7 @@ async function fetchJobUrls(queries, profile) {
       }
     }
   }
-  console.log(`   ${allResults.length} unique raw JD results collected`);
+  // console.log(`   ${allResults.length} unique raw JD results collected`);
   return allResults;
 }
 
@@ -290,6 +269,47 @@ export const findJobsForResume = async (resumeId) => {
     };
   } catch (error) {
     console.error('Error finding jobs for resume:', error);
+    throw error;
+  }
+};
+
+export const scoreJDForResume = async (resumeId, jdText) => {
+  try {
+    const resume = await prisma.resume.findUnique({
+      where: { id: resumeId }
+    });
+
+    if (!resume) throw new Error('Resume not found');
+    if (!jdText || !jdText.trim()) throw new Error('Job description text is required');
+
+    const resumeProfile = JSON.parse(resume.extractedProfile);
+    const jdProfile = extractJD(jdText);
+    const eligibility = checkEligibility(resumeProfile, jdProfile);
+
+    if (!eligibility.eligible) {
+      return {
+        resumeProfile,
+        jdProfile,
+        scoreReport: null,
+        eligibility: {
+          status: 'notEligible',
+          reason: eligibility.reason,
+        },
+      };
+    }
+
+    const scoreReport = scoreResume(resumeProfile, jdProfile);
+
+    return {
+      resumeProfile,
+      jdProfile,
+      scoreReport,
+      eligibility: {
+        status: 'eligible',
+      },
+    };
+  } catch (error) {
+    console.error('Error scoring JD for resume:', error);
     throw error;
   }
 };

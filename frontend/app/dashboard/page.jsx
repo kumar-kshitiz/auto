@@ -7,13 +7,17 @@ import {
   ExternalLink, Sparkles, Award, Search, Loader2
 } from 'lucide-react';
 import Link from 'next/link';
-import { findJobs } from '../../services/api';
+import { findJobs, scoreJD } from '../../services/api';
 import toast from 'react-hot-toast';
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [isMounted, setIsMounted] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [isScoring, setIsScoring] = useState(false);
+  const [jdText, setJdText] = useState("");
+  const [jdScore, setJdScore] = useState(null);
+  const [scoreError, setScoreError] = useState("");
 
   useEffect(() => {
     setIsMounted(true);
@@ -52,6 +56,34 @@ export default function Dashboard() {
     }
   };
 
+  const handleScoreJD = async () => {
+    if (!data || !data.id) {
+      toast.error("Resume ID not found. Please upload again.");
+      return;
+    }
+
+    if (!jdText.trim()) {
+      setScoreError("Please paste the job description text to score it.");
+      return;
+    }
+
+    setScoreError("");
+    setIsScoring(true);
+    const toastId = toast.loading("Scoring JD against your resume...");
+
+    try {
+      const response = await scoreJD(data.id, jdText);
+      setJdScore(response);
+      toast.success("JD scored successfully!", { id: toastId });
+    } catch (error) {
+      console.error("Error scoring JD:", error);
+      setScoreError("Failed to score JD. Try again.");
+      toast.error("Failed to score JD. Try again.", { id: toastId });
+    } finally {
+      setIsScoring(false);
+    }
+  };
+
   if (!isMounted) return null;
 
   if (!data || !data.extractedProfile) {
@@ -79,6 +111,29 @@ export default function Dashboard() {
     year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
   });
 
+  const formatRequiredExperience = (exp) => {
+    if (!exp) return 'Not specified';
+    if (typeof exp === 'string') return exp;
+    if (typeof exp === 'number') return `${exp} year${exp === 1 ? '' : 's'}`;
+    if (typeof exp === 'object') {
+      if (exp.min != null || exp.max != null) {
+        const minText = exp.min != null ? `${exp.min}${exp.max == null ? '+' : ''}` : null;
+        const maxText = exp.max != null ? `${exp.max}` : null;
+        if (minText && maxText) return `${minText} - ${maxText} years`;
+        if (minText) return `${minText} years`;
+        if (maxText) return `Up to ${maxText} years`;
+      }
+      return JSON.stringify(exp);
+    }
+    return String(exp);
+  };
+
+  const renderScoreDetail = (detail) => {
+    if (detail == null) return 'No detail available';
+    if (typeof detail === 'object') return JSON.stringify(detail);
+    return detail;
+  };
+
   const experienceDisplay = (() => {
     const exp = extractedProfile.experience;
     if (exp && typeof exp === 'object' && exp.totalMonths != null) {
@@ -93,6 +148,9 @@ export default function Dashboard() {
     if (typeof raw === 'number') return `${raw} year${raw === 1 ? '' : 's'}`;
     return `${raw || 0} years`;
   })();
+
+  const isJdNotEligible = jdScore?.eligibility?.status === 'notEligible';
+  const jdEligibilityReason = jdScore?.eligibility?.reason || "";
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10 space-y-8">
@@ -161,6 +219,122 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* JD Scoring */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Score a Job Description</h2>
+            <p className="text-gray-500 mt-2 max-w-2xl">
+              Paste the JD text below after your resume has been parsed. The system will score it using the built-in resume ↔ JD ranking logic.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={handleScoreJD}
+              disabled={isScoring || !jdText.trim() || !data?.id}
+              className="inline-flex items-center justify-center px-5 py-3 rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {isScoring ? (
+                <>
+                  <Loader2 className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" />
+                  Scoring JD...
+                </>
+              ) : (
+                "Score JD"
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setJdText(""); setJdScore(null); setScoreError(""); }}
+              className="inline-flex items-center justify-center px-5 py-3 rounded-xl text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+
+        <textarea
+          value={jdText}
+          onChange={(e) => setJdText(e.target.value)}
+          placeholder="Paste the full job description here..."
+          className="w-full min-h-[180px] rounded-2xl border border-gray-200 p-4 text-sm text-gray-900 resize-none focus:border-indigo-500 focus:ring-indigo-100 focus:outline-none"
+        />
+
+        {scoreError ? (
+          <p className="mt-3 text-sm text-red-600">{scoreError}</p>
+        ) : null}
+
+        {isJdNotEligible ? (
+          <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-5">
+            <p className="text-sm font-semibold text-red-700">Not Eligible</p>
+            <p className="mt-3 text-sm text-red-600">{jdEligibilityReason || 'Your resume does not match the job description eligibility requirements.'}</p>
+          </div>
+        ) : null}
+
+        {jdScore && !isJdNotEligible ? (
+          <div className="mt-6 grid gap-4 lg:grid-cols-3">
+            <div className="rounded-2xl border border-gray-100 p-5 bg-slate-50">
+              <p className="text-sm text-gray-500">Overall JD Fit</p>
+              <p className="mt-3 text-4xl font-bold text-indigo-700">{jdScore.scoreReport.total}%</p>
+              <p className="mt-2 text-sm text-gray-600">{jdScore.scoreReport.tier === 'fresher' ? 'Fresher match' : 'Experienced match'}</p>
+            </div>
+            <div className="rounded-2xl border border-gray-100 p-5 bg-slate-50">
+              <p className="text-sm text-gray-500">Recommendation</p>
+              <p className="mt-3 text-base font-semibold text-gray-900">{jdScore.scoreReport.recommendation}</p>
+            </div>
+            <div className="rounded-2xl border border-gray-100 p-5 bg-slate-50">
+              <p className="text-sm text-gray-500">JD Title</p>
+              <p className="mt-3 text-base font-semibold text-gray-900">{jdScore.jdProfile.title || 'Parsed JD'}</p>
+              <p className="mt-2 text-sm text-gray-600">Required exp: {formatRequiredExperience(jdScore.jdProfile.requiredExperience)}</p>
+            </div>
+          </div>
+        ) : null}
+
+        {jdScore && !isJdNotEligible ? (
+          <div className="mt-6 grid gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border border-gray-100 p-5 bg-white">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Strengths</h3>
+              <ul className="list-disc pl-5 text-sm text-gray-700 space-y-2">
+                {jdScore.scoreReport.strengths.length > 0 ? (
+                  jdScore.scoreReport.strengths.map((item, idx) => (
+                    <li key={idx}>{item}</li>
+                  ))
+                ) : (
+                  <li>No strong matches detected yet.</li>
+                )}
+              </ul>
+            </div>
+            <div className="rounded-2xl border border-gray-100 p-5 bg-white">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Gaps</h3>
+              <ul className="list-disc pl-5 text-sm text-gray-700 space-y-2">
+                {jdScore.scoreReport.gaps.length > 0 ? (
+                  jdScore.scoreReport.gaps.map((item, idx) => (
+                    <li key={idx}>{item}</li>
+                  ))
+                ) : (
+                  <li>No major gaps detected.</li>
+                )}
+              </ul>
+            </div>
+          </div>
+        ) : null}
+
+        {jdScore && !isJdNotEligible ? (
+          <div className="mt-6 bg-gray-50 rounded-2xl border border-gray-100 p-5">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">Score Breakdown</h3>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {Object.entries(jdScore.scoreReport.breakdown).map(([key, value]) => (
+                <div key={key} className="rounded-2xl border border-gray-200 p-4 bg-white">
+                  <p className="text-sm text-gray-500 uppercase tracking-wide">{key}</p>
+                  <p className="mt-2 text-2xl font-bold text-gray-900">{value.score}%</p>
+                  <p className="mt-2 text-sm text-gray-600">{renderScoreDetail(value.detail)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* Job Listings */}

@@ -23,3 +23,8 @@ export const findJobs = async (resumeId) => {
   const response = await apiClient.get(`/resume/${resumeId}/jobs`);
   return response.data;
 };
+
+export const scoreJD = async (resumeId, jdText) => {
+  const response = await apiClient.post(`/resume/${resumeId}/score-jd`, { jdText });
+  return response.data.data;
+};
